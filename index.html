@@ -80,7 +80,6 @@ if (recognition) {
       "<br>➡ N5変換: " + n5text +
       "<br>📘 N5判定: " + (isN5 ? "✔ N5レベルです" : "❌ N5レベルではありません");
 
-    // 読み上げ
     if (speechSynthesis.speaking || speechSynthesis.pending) {
       speechSynthesis.cancel();
     }
@@ -175,7 +174,7 @@ function simplifyVocabularyN5(text) {
   return t;
 }
 
-// ===== ⑤ 文末正規化 =====
+// ===== ⑤ 文末正規化（最後に実行） =====
 function normalizeSentenceEnd(text) {
   let t = text;
 
@@ -230,4 +229,3 @@ function convertToN5(text, isN5) {
 
 </body>
 </html>
-
