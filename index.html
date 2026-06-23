@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>N4変換音声アプリ</title>
+<title>N4変換音声アプリ（改良版）</title>
 
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#ffffff">
@@ -47,7 +47,7 @@ button { font-size: 20px; padding: 12px 24px; }
 </head>
 <body>
 
-<h2>🎤 N4レベル変換・音声出力アプリ</h2>
+<h2>🎤 N4レベル変換・音声出力アプリ（改良版）</h2>
 <p>ボタンを押して話してください。</p>
 
 <button id="startBtn">録音開始</button>
@@ -62,33 +62,47 @@ button { font-size: 20px; padding: 12px 24px; }
 </div>
 
 <script>
-// 音声認識
-let recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-recognition.lang = "ja-JP";
-recognition.interimResults = false;
+// ===== 音声認識の初期化 =====
+const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recognition = null;
 
-const startBtn = document.getElementById("startBtn");
-const statusDiv = document.getElementById("status");
-const resultDiv = document.getElementById("result");
+if (SpeechRec) {
+  recognition = new SpeechRec();
+  recognition.lang = "ja-JP";
+  recognition.interimResults = false;
+} else {
+  alert("このブラウザは音声認識に対応していません。Chrome系を推奨します。");
+}
 
+const startBtn   = document.getElementById("startBtn");
+const statusDiv  = document.getElementById("status");
+const resultDiv  = document.getElementById("result");
 const rateSlider = document.getElementById("rateSlider");
-const rateValue = document.getElementById("rateValue");
+const rateValue  = document.getElementById("rateValue");
 
 // スライダー変更時に表示更新
 rateSlider.oninput = () => {
-    rateValue.textContent = rateSlider.value;
+  rateValue.textContent = rateSlider.value;
 };
 
-// 録音開始
+// ===== 録音開始 =====
 startBtn.onclick = () => {
-    statusDiv.innerHTML = "🎤 録音中…";
-    statusDiv.className = "recording";
-    resultDiv.innerHTML = "";
-    recognition.start();
+  if (!recognition) return;
+
+  // 前の読み上げが残っていたら止める
+  if (speechSynthesis.speaking || speechSynthesis.pending) {
+    speechSynthesis.cancel();
+  }
+
+  statusDiv.innerHTML = "🎤 録音中…";
+  statusDiv.className = "recording";
+  resultDiv.innerHTML = "";
+  recognition.start();
 };
 
-// 音声認識結果
-recognition.onresult = (event) => {
+// ===== 音声認識結果 =====
+if (recognition) {
+  recognition.onresult = (event) => {
     const text = event.results[0][0].transcript.trim();
 
     statusDiv.className = "loading";
@@ -96,61 +110,106 @@ recognition.onresult = (event) => {
 
     resultDiv.innerHTML = "認識結果: " + text;
 
-    // AI自然N4変換
+    // N4変換
     const n4text = convertToNaturalN4(text);
 
     setTimeout(() => {
-        statusDiv.className = "";
-        statusDiv.innerHTML = "🟢 読み上げ中…";
+      statusDiv.className = "";
+      statusDiv.innerHTML = "🟢 読み上げ中…";
 
-        resultDiv.innerHTML += "<br>➡ N4変換: " + n4text;
+      resultDiv.innerHTML += "<br>➡ N4変換: " + n4text;
 
-        // 音声読み上げ
-        const uttr = new SpeechSynthesisUtterance(n4text);
-        uttr.lang = "ja-JP";
-        uttr.rate = parseFloat(rateSlider.value); // 速度反映
+      // 読み上げ前に一応キャンセル
+      if (speechSynthesis.speaking || speechSynthesis.pending) {
+        speechSynthesis.cancel();
+      }
 
-        speechSynthesis.speak(uttr);
+      const uttr = new SpeechSynthesisUtterance(n4text);
+      uttr.lang  = "ja-JP";
+      uttr.rate  = parseFloat(rateSlider.value);
 
-        uttr.onend = () => {
-            statusDiv.innerHTML = "✔ 完了";
-        };
-    }, 500);
-};
+      speechSynthesis.speak(uttr);
 
-// 自然なN4変換AIロジック
+      uttr.onend = () => {
+        statusDiv.innerHTML = "✔ 完了";
+      };
+    }, 400);
+  };
+
+  // ===== エラー処理 =====
+  recognition.onerror = (e) => {
+    statusDiv.className = "";
+    statusDiv.innerHTML = "❌ エラー: " + e.error;
+  };
+
+  recognition.onend = () => {
+    // 録音が自然終了したときに録音中表示を戻す
+    if (statusDiv.className === "recording") {
+      statusDiv.className = "";
+      statusDiv.innerHTML = "⏹ 録音終了";
+    }
+  };
+}
+
+// ===== N4変換ロジック =====
 function detectQuestionType(text) {
-    if (text.includes("なぜ") || text.includes("どうして"))
-        return "reason";
-    if (text.includes("どこ") || text.includes("いつ") || text.includes("何"))
-        return "fact";
-    return "general";
+  if (text.includes("なぜ") || text.includes("どうして")) return "reason";
+  if (text.includes("どこ") || text.includes("いつ") || text.includes("何")) return "fact";
+  return "general";
+}
+
+// 終助詞や「ですか」「ますか」などを整理
+function normalizeSentenceEnd(text) {
+  let t = text;
+
+  // 全角スペースなど除去
+  t = t.replace(/\s+$/g, "");
+
+  // 「ね」「よ」「よね」「かな」など終助詞を軽く削る
+  t = t.replace(/(ですね|ですよね|ですよ|だよね|だよ|かな|かも|ね|よ)$/g, "");
+
+  // 「ですか」「ますか」「ましたか」→ 語幹に
+  t = t.replace(/ですか$/g, "です")
+       .replace(/ますか$/g, "ます")
+       .replace(/ましたか$/g, "ました");
+
+  // 「か？」などの疑問符
+  t = t.replace(/か[？?]$/g, "");
+
+  // 末尾の「。」削除
+  t = t.replace(/。$/g, "");
+
+  return t;
 }
 
 function convertToNaturalN4(text) {
-    const type = detectQuestionType(text);
-    let t = text;
+  const type = detectQuestionType(text);
+  let t = normalizeSentenceEnd(text);
 
-    // 文末処理
-    t = t.replace(/ですか$/, "")
-         .replace(/ますか$/, "ます")
-         .replace(/ましたか$/, "ました");
+  // 何も残らなかった場合の保険
+  if (!t) t = text;
 
-    if (type === "reason") {
-        if (!t.startsWith("どうして")) t = "どうして " + t;
-        return t + "んですか";
+  if (type === "reason") {
+    if (!t.startsWith("どうして") && !t.startsWith("なぜ")) {
+      t = "どうして " + t;
     }
-
-    if (type === "fact") {
-        return t + "んですか";
-    }
-
     return t + "んですか";
+  }
+
+  if (type === "fact") {
+    return t + "んですか";
+  }
+
+  // 一般文も N4っぽく「んですか」で統一
+  return t + "んですか";
 }
 
-// PWA Service Worker
+// ===== PWA Service Worker =====
 if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("sw.js");
+  navigator.serviceWorker
+    .register("sw.js")
+    .then(() => console.log("Service Worker 登録成功"))
+    .catch(err => console.log("Service Worker 登録失敗:", err));
 }
 </script>
 
