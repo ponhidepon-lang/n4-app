@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>N5変換音声アプリ（語彙簡単化つき）</title>
+<title>N5変換音声アプリ（完全N5ロジック＋判定＋速度調整）</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
@@ -13,17 +13,25 @@ button { font-size: 20px; padding: 12px 24px; }
 @keyframes blink { 0%{opacity:1;} 50%{opacity:0.2;} 100%{opacity:1;} }
 .loading::after { content:" 🔄"; animation: spin 1s linear infinite; }
 @keyframes spin { 0%{transform:rotate(0);} 100%{transform:rotate(360deg);} }
+
+.slider-box { margin-top: 20px; font-size: 18px; }
 </style>
 </head>
 <body>
 
-<h2>🎤 N5レベル変換・音声アプリ（語彙もやさしく）</h2>
+<h2>🎤 N5レベル変換・音声アプリ（完全版）</h2>
 <p>ボタンを押して話してください。</p>
 
 <button id="startBtn">録音開始</button>
 
 <div id="status"></div>
 <div id="result"></div>
+
+<!-- 読み上げ速度調整 -->
+<div class="slider-box">
+  🔊 読み上げ速度：<span id="rateValue">1.0</span><br>
+  <input type="range" id="rateSlider" min="0.5" max="2.0" step="0.1" value="1.0">
+</div>
 
 <script>
 // ===== 音声認識 =====
@@ -41,6 +49,13 @@ if (SpeechRec) {
 const startBtn  = document.getElementById("startBtn");
 const statusDiv = document.getElementById("status");
 const resultDiv = document.getElementById("result");
+const rateSlider = document.getElementById("rateSlider");
+const rateValue  = document.getElementById("rateValue");
+
+// スライダー表示更新
+rateSlider.oninput = () => {
+  rateValue.textContent = rateSlider.value;
+};
 
 // ===== 録音開始 =====
 startBtn.onclick = () => {
@@ -62,19 +77,26 @@ if (recognition) {
     resultDiv.innerHTML = "認識結果: " + text;
 
     const n5text = convertToN5(text);
+    const score  = judgeFatigue(text);
 
     setTimeout(() => {
       statusDiv.className = "";
-      statusDiv.innerHTML = "🟢 完了";
+      statusDiv.innerHTML = "🟢 読み上げ中…";
 
       resultDiv.innerHTML += "<br>➡ N5変換: " + n5text;
+      resultDiv.innerHTML += "<br>🧪 疲労度判定: " + score;
 
       if (speechSynthesis.speaking || speechSynthesis.pending) {
         speechSynthesis.cancel();
       }
       const uttr = new SpeechSynthesisUtterance(n5text);
       uttr.lang = "ja-JP";
+      uttr.rate = parseFloat(rateSlider.value);
       speechSynthesis.speak(uttr);
+
+      uttr.onend = () => {
+        statusDiv.innerHTML = "✔ 完了";
+      };
     }, 300);
   };
 
@@ -91,13 +113,44 @@ if (recognition) {
   };
 }
 
-// ===== 語彙をN5レベルに簡単化 =====
+// ===== 疲労度判定（簡易） =====
+function judgeFatigue(text) {
+  const low  = /(元気|大丈夫|平気|問題ない)/;
+  const mid  = /(まあまあ|普通|ふつう)/;
+  const high = /(疲れた|しんどい|つらい|だるい|ねむい)/;
+
+  if (high.test(text)) return "高い（かなり疲れています）";
+  if (mid.test(text))  return "中くらい";
+  if (low.test(text))  return "低い（元気です）";
+
+  return "不明（もう一度お願いします）";
+}
+
+// ===== ① 複文 → 単文 =====
+function splitComplexSentence(text) {
+  return text.replace(/けど|ですが|しかし/g, "。");
+}
+
+// ===== ② 否定疑問 → 肯定疑問 =====
+function convertNegativeQuestionToPositive(text) {
+  return text
+    .replace(/(.+?)くはなかったですか/g, "$1かったですか")
+    .replace(/(.+?)くなかったですか/g, "$1かったですか");
+}
+
+// ===== ③ 部分否定 → 肯定文 =====
+function removePartialNegative(text) {
+  return text
+    .replace(/(.+?)くはない/g, "$1い")
+    .replace(/(.+?)くない/g, "$1い");
+}
+
+// ===== ④ 語彙簡単化 =====
 function simplifyVocabularyN5(text) {
   let t = text;
 
   const map = {
     "体感的": "どう感じますか",
-    "体感": "感じ",
     "体調": "からだの調子",
     "状況": "ようす",
     "可能": "できます",
@@ -121,7 +174,7 @@ function simplifyVocabularyN5(text) {
   return t;
 }
 
-// ===== 文末正規化 =====
+// ===== ⑤ 文末正規化 =====
 function normalizeSentenceEnd(text) {
   let t = text;
 
@@ -138,32 +191,37 @@ function normalizeSentenceEnd(text) {
   return t.trim();
 }
 
-// ===== N5変換ロジック（語彙簡単化つき） =====
-function convertToN5(text) {
-  // ① 語彙をN5に簡単化
-  let t = simplifyVocabularyN5(text);
+// ===== ⑥ N5疑問文に変換 =====
+function convertToN5Question(text) {
+  const t = text;
 
-  // ② 文末正規化
-  t = normalizeSentenceEnd(t);
-
-  // ③ 丁寧語はそのまま疑問文
   if (t.match(/でした$/)) return t + "か";
   if (t.match(/ました$/)) return t + "か";
   if (t.match(/ます$/))   return t + "か";
   if (t.match(/です$/))   return t + "か";
 
-  // ④ 疑問詞
   if (t.match(/(どこ|いつ|何|なに|だれ|誰)/)) {
     return t + "ですか";
   }
 
-  // ⑤ 理由系（N5では簡単化）
   if (t.includes("どうして") || t.includes("なぜ")) {
     return "どうしてですか";
   }
 
-  // ⑥ デフォルト
   return t + "ですか";
+}
+
+// ===== 完全N5変換メイン =====
+function convertToN5(text) {
+  let t = text;
+
+  t = splitComplexSentence(t);
+  t = convertNegativeQuestionToPositive(t);
+  t = removePartialNegative(t);
+  t = simplifyVocabularyN5(t);
+  t = normalizeSentenceEnd(t);
+
+  return convertToN5Question(t);
 }
 </script>
 
