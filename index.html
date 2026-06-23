@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>N5変換音声アプリ（最終版：N5仕様＋判定）</title>
+<title>N5変換音声アプリ（文脈置換・完全N5エンジン）</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
@@ -19,7 +19,7 @@ button { font-size: 20px; padding: 12px 24px; }
 </head>
 <body>
 
-<h2>🎤 N5レベル変換・音声アプリ（最終版：N5仕様）</h2>
+<h2>🎤 N5レベル変換・音声アプリ（文脈置換・完全N5仕様）</h2>
 <p>ボタンを押して話してください。</p>
 
 <button id="startBtn">録音開始</button>
@@ -41,6 +41,8 @@ if (SpeechRec) {
   recognition = new SpeechRec();
   recognition.lang = "ja-JP";
   recognition.interimResults = false;
+} else {
+  alert("音声認識に対応していません。Chrome を使ってください。");
 }
 
 const startBtn  = document.getElementById("startBtn");
@@ -105,77 +107,91 @@ if (recognition) {
   };
 }
 
-// ===== N5判定（ざっくりヒューリスティック） =====
+// ===== N5判定（ざっくり） =====
 function isN5Level(text) {
   const hardWords = [
     "慣れ","出発","説明","連絡","理解","使用",
-    "必要","可能","状況","体調","変更","最近"
+    "必要","可能","状況","体調","変更","最近","ために","ので"
   ];
   for (const w of hardWords) {
     if (text.includes(w)) return false;
   }
-  if (text.match(/けど|ですが|しかし|ので|ために/)) return false;
+  if (text.match(/けど|ですが|しかし/)) return false;
   return true;
 }
 
-// ===== ① 複文 → 単文（N5向けに分割） =====
+// ===== ① 複文 → 単文 =====
 function splitComplexSentence(text) {
   return text.replace(/けど|ですが|しかし|なので|だから/g, "。");
 }
 
-// ===== ② 複合動詞 → 単純動詞（N5仕様） =====
-function simplifyComplexVerbs(text) {
-  return text
-    .replace(/出発して来ましたか？/g, "出ましたか？")
-    .replace(/出発してきましたか？/g, "出ましたか？")
-    .replace(/出発して来ました/g, "出ました")
-    .replace(/出発してきました/g, "出ました")
-    .replace(/出発して来た/g, "出ました")
-    .replace(/出発してきた/g, "出ました")
-    .replace(/説明してくれましたか？/g, "せつめいしましたか？")
-    .replace(/説明してくれました/g, "せつめいしました")
-    .replace(/連絡してくれましたか？/g, "れんらくしましたか？")
-    .replace(/連絡してくれました/g, "れんらくしました");
-}
-
-// ===== ③ 語彙 → N5語彙（自然N5） =====
-function simplifyToN5Vocabulary(text) {
+// ===== ② 複合動詞・動詞活用の文脈置換（N4→N5） =====
+function simplifyVerbsContext(text) {
   let t = text;
 
-  const map = {
-    "慣れましたか": "どうですか",
-    "慣れました": "どうですか",
-    "慣れていますか": "どうですか",
-    "慣れた": "どうですか",
-    "慣れる": "なれます",
+  // 出発する 系
+  t = t.replace(/出発してきましたか？/g, "出ましたか？");
+  t = t.replace(/出発して来ましたか？/g, "出ましたか？");
+  t = t.replace(/出発してきました/g, "出ました");
+  t = t.replace(/出発して来ました/g, "出ました");
+  t = t.replace(/出発しましたか？/g, "出ましたか？");
+  t = t.replace(/出発しました/g, "出ました");
+  t = t.replace(/出発します/g, "出ます");
 
-    "出発": "出ます",
-    "説明": "せつめい",
-    "連絡": "れんらく",
-    "理解": "わかります",
-    "使用": "つかいます",
-    "必要": "いります",
-    "可能": "できます",
-    "状況": "ようす",
-    "体調": "からだの調子",
-    "理由": "わけ",
-    "問題": "こまったこと",
-    "変更": "かえます",
-    "最近": "さいきん"
-  };
+  // 説明する 系
+  t = t.replace(/説明してくれましたか？/g, "せつめいしましたか？");
+  t = t.replace(/説明してくれました/g, "せつめいしました");
+  t = t.replace(/説明しましたか？/g, "せつめいしましたか？");
+  t = t.replace(/説明しました/g, "せつめいしました");
+  t = t.replace(/説明します/g, "せつめいします");
 
-  for (const key in map) {
-    const reg = new RegExp(key, "g");
-    t = t.replace(reg, map[key]);
-  }
+  // 連絡する 系
+  t = t.replace(/連絡してくれましたか？/g, "れんらくしましたか？");
+  t = t.replace(/連絡してくれました/g, "れんらくしました");
+  t = t.replace(/連絡しましたか？/g, "れんらくしましたか？");
+  t = t.replace(/連絡しました/g, "れんらくしました");
+  t = t.replace(/連絡します/g, "れんらくします");
+
+  // 理解する 系
+  t = t.replace(/理解しましたか？/g, "わかりましたか？");
+  t = t.replace(/理解しました/g, "わかりました");
+  t = t.replace(/理解できます/g, "わかります");
+
+  // 使用する 系
+  t = t.replace(/使用しました/g, "つかいました");
+  t = t.replace(/使用します/g, "つかいます");
 
   return t;
 }
 
-// ===== ④ 文末のノイズ除去（句点・全角スペースなど） =====
+// ===== ③ 名詞・形容表現の文脈置換（N4→N5） =====
+function simplifyNounsContext(text) {
+  let t = text;
+
+  t = t.replace(/必要です/g, "いります");
+  t = t.replace(/必要があります/g, "いります");
+  t = t.replace(/可能です/g, "できます");
+  t = t.replace(/状況/g, "ようす");
+  t = t.replace(/体調/g, "からだの調子");
+  t = t.replace(/理由/g, "わけ");
+  t = t.replace(/問題/g, "こまったこと");
+  t = t.replace(/変更/g, "かえます");
+  t = t.replace(/最近/g, "さいきん");
+
+  // 慣れる 系（自然N5）
+  t = t.replace(/日本の生活には慣れましたか？/g, "日本の生活はどうですか？");
+  t = t.replace(/日本の生活には慣れましたか/g, "日本の生活はどうですか");
+  t = t.replace(/日本の生活に慣れましたか？/g, "日本の生活はどうですか？");
+  t = t.replace(/日本の生活に慣れましたか/g, "日本の生活はどうですか");
+
+  return t;
+}
+
+// ===== ④ 文末ノイズ除去（句点・全角スペース・重複？） =====
 function normalizeSentenceEnd(text) {
   let t = text.trim();
-  t = t.replace(/[。．]+$/g, ""); // 文末の。を削除
+  t = t.replace(/[。．]+$/g, "");
+  t = t.replace(/[？?]+$/g, "");
   return t.trim();
 }
 
@@ -188,6 +204,7 @@ function ensureQuestionMark(text) {
 
   // 「か」で終わるなら疑問文とみなして「？」を付ける
   if (t.endsWith("か")) return t + "？";
+  if (t.endsWith("かね")) return t + "？";
 
   // 「か。」のような誤認識パターン
   if (t.endsWith("か。")) return t.slice(0, -1) + "？";
@@ -196,23 +213,23 @@ function ensureQuestionMark(text) {
   return t;
 }
 
-// ===== ★ 完全N5変換（あなたの仕様に合わせた最終版） =====
+// ===== ★ 完全N5変換（文脈置換方式） =====
 function convertToN5(text) {
   let t = text;
 
-  // ① 複文を単文に
+  // ① 複文 → 単文
   t = splitComplexSentence(t);
 
-  // ② 複合動詞 → 単純動詞
-  t = simplifyComplexVerbs(t);
+  // ② 動詞・複合動詞の文脈置換
+  t = simplifyVerbsContext(t);
 
-  // ③ 語彙 → N5語彙
-  t = simplifyToN5Vocabulary(t);
+  // ③ 名詞・表現の文脈置換
+  t = simplifyNounsContext(t);
 
-  // ④ 文末ノイズ除去（。だけ消す）
+  // ④ 文末ノイズ除去（。と？を一旦外す）
   t = normalizeSentenceEnd(t);
 
-  // ⑤ 疑問形式は尊重しつつ「？」だけ整える
+  // ⑤ 疑問形式はそのまま尊重しつつ「？」だけ整える
   t = ensureQuestionMark(t);
 
   return t;
