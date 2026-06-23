@@ -4,21 +4,158 @@
 <meta charset="UTF-8">
 <title>N4変換音声アプリ</title>
 
-<!-- PWA対応 -->
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#ffffff">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
 body { font-family: sans-serif; padding: 20px; }
-button { font-size: 20px; padding: 10px 20px; }
-#result { margin-top: 20px; font-size: 22px; }
+button { font-size: 20px; padding: 12px 24px; }
+
+#status {
+  margin-top: 20px;
+  font-size: 22px;
+  font-weight: bold;
+}
+
+/* 録音中：赤点滅 */
+.recording {
+  color: red;
+  animation: blink 1s infinite;
+}
+@keyframes blink {
+  0% { opacity: 1; }
+  50% { opacity: 0.2; }
+  100% { opacity: 1; }
+}
+
+/* 変換中：青いぐるぐる */
+.loading::after {
+  content: " 🔄";
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.slider-box {
+  margin-top: 20px;
+  font-size: 18px;
+}
 </style>
 </head>
 <body>
 
 <h2>🎤 N4レベル変換・音声出力アプリ</h2>
 <p>ボタンを押して話してください。</p>
+
+<button id="startBtn">録音開始</button>
+
+<div id="status"></div>
+<div id="result"></div>
+
+<!-- 読み上げ速度調整 -->
+<div class="slider-box">
+  🔊 読み上げ速度：<span id="rateValue">1.0</span><br>
+  <input type="range" id="rateSlider" min="0.5" max="2.0" step="0.1" value="1.0">
+</div>
+
+<script>
+// 音声認識
+let recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+recognition.lang = "ja-JP";
+recognition.interimResults = false;
+
+const startBtn = document.getElementById("startBtn");
+const statusDiv = document.getElementById("status");
+const resultDiv = document.getElementById("result");
+
+const rateSlider = document.getElementById("rateSlider");
+const rateValue = document.getElementById("rateValue");
+
+// スライダー変更時に表示更新
+rateSlider.oninput = () => {
+    rateValue.textContent = rateSlider.value;
+};
+
+// 録音開始
+startBtn.onclick = () => {
+    statusDiv.innerHTML = "🎤 録音中…";
+    statusDiv.className = "recording";
+    resultDiv.innerHTML = "";
+    recognition.start();
+};
+
+// 音声認識結果
+recognition.onresult = (event) => {
+    const text = event.results[0][0].transcript.trim();
+
+    statusDiv.className = "loading";
+    statusDiv.innerHTML = "🔄 変換中…";
+
+    resultDiv.innerHTML = "認識結果: " + text;
+
+    // AI自然N4変換
+    const n4text = convertToNaturalN4(text);
+
+    setTimeout(() => {
+        statusDiv.className = "";
+        statusDiv.innerHTML = "🟢 読み上げ中…";
+
+        resultDiv.innerHTML += "<br>➡ N4変換: " + n4text;
+
+        // 音声読み上げ
+        const uttr = new SpeechSynthesisUtterance(n4text);
+        uttr.lang = "ja-JP";
+        uttr.rate = parseFloat(rateSlider.value); // ← 速度反映！
+
+        speechSynthesis.speak(uttr);
+
+        uttr.onend = () => {
+            statusDiv.innerHTML = "✔ 完了";
+        };
+    }, 500);
+};
+
+// 自然なN4変換AIロジック
+function detectQuestionType(text) {
+    if (text.includes("なぜ") || text.includes("どうして"))
+        return "reason";
+    if (text.includes("どこ") || text.includes("いつ") || text.includes("何"))
+        return "fact";
+    return "general";
+}
+
+function convertToNaturalN4(text) {
+    const type = detectQuestionType(text);
+    let t = text;
+
+    // 文末処理
+    t = t.replace(/ですか$/, "")
+         .replace(/ますか$/, "ます")
+         .replace(/ましたか$/, "ました");
+
+    if (type === "reason") {
+        if (!t.startsWith("どうして")) t = "どうして " + t;
+        return t + "んですか";
+    }
+
+    if (type === "fact") {
+        return t + "んですか";
+    }
+
+    return t + "んですか";
+}
+
+// PWA Service Worker
+if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("sw.js");
+}
+</script>
+
+</body>
+</html>
 
 <button id="startBtn">録音開始</button>
 
