@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>N4変換音声アプリ</title>
+<title>N4変換音声アプリ（自然疑問文・完全最新版）</title>
 
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#ffffff">
@@ -47,7 +47,7 @@ button { font-size: 20px; padding: 12px 24px; }
 </head>
 <body>
 
-<h2>🎤 N4レベル変換・音声出力アプリ（自然疑問文版）</h2>
+<h2>🎤 N4レベル変換・音声出力アプリ（自然疑問文・完全最新版）</h2>
 <p>ボタンを押して話してください。</p>
 
 <button id="startBtn">録音開始</button>
@@ -85,7 +85,7 @@ rateSlider.oninput = () => {
   rateValue.textContent = rateSlider.value;
 };
 
-// ===== 録音開始（cancel() を削除して安定化） =====
+// ===== 録音開始 =====
 startBtn.onclick = () => {
   if (!recognition) return;
 
@@ -115,7 +115,7 @@ if (recognition) {
 
       resultDiv.innerHTML += "<br>➡ N4変換: " + n4text;
 
-      // 読み上げ前にだけ cancel() を実行（安全）
+      // 読み上げ前に cancel()
       if (speechSynthesis.speaking || speechSynthesis.pending) {
         speechSynthesis.cancel();
       }
@@ -132,7 +132,6 @@ if (recognition) {
     }, 400);
   };
 
-  // ===== エラー処理 =====
   recognition.onerror = (e) => {
     statusDiv.className = "";
     statusDiv.innerHTML = "❌ エラー: " + e.error;
@@ -146,55 +145,54 @@ if (recognition) {
   };
 }
 
-// ===== 文末正規化 =====
+// ===== 文末正規化（強化版） =====
 function normalizeSentenceEnd(text) {
   let t = text;
 
+  // 終助詞削除
   t = t.replace(/(ですね|ですよね|ですよ|だよね|だよ|かな|かも|ね|よ)$/g, "");
-  t = t.replace(/ですか$/g, "です")
-       .replace(/ますか$/g, "ます")
-       .replace(/ましたか$/g, "ました");
+
+  // 「でしたか」「ましたか」「ますか」「ですか」を壊さず語幹に戻す
+  t = t.replace(/でしたか$/g, "でした");
+  t = t.replace(/ましたか$/g, "ました");
+  t = t.replace(/ますか$/g, "ます");
+  t = t.replace(/ですか$/g, "です");
+
+  // 疑問符削除
   t = t.replace(/か[？?]$/g, "");
+
+  // 句点削除
   t = t.replace(/。$/g, "");
 
   return t.trim();
 }
 
-// ===== 自然なN4疑問文変換 =====
+// ===== 自然なN4疑問文変換（完全版） =====
 function convertToNaturalN4(text) {
   const t = normalizeSentenceEnd(text);
 
-  // ★ 丁寧語（〜です）はそのまま疑問文
-  if (t.match(/です$/)) {
-    return t + "か";
-  }
+  // ★ 最優先：丁寧語（です／ます／ました／でした）はそのまま疑問文
+  if (t.match(/でした$/)) return t + "か";
+  if (t.match(/ました$/)) return t + "か";
+  if (t.match(/ます$/))   return t + "か";
+  if (t.match(/です$/))   return t + "か";
 
-  // ★ 丁寧語（〜ます）もそのまま疑問文
-  if (t.match(/ます$/)) {
-    return t + "か";
-  }
-
-  // ★ 過去形（〜ました）もそのまま疑問文
-  if (t.match(/ました$/)) {
-    return t + "か";
-  }
-
-  // 理由系 → んですか
+  // ★ 理由系 → んですか
   if (t.includes("なぜ") || t.includes("どうして")) {
     return t + "んですか";
   }
 
-  // 疑問詞 → ですか
+  // ★ 疑問詞 → ですか
   if (t.match(/(どこ|いつ|何|なに|だれ|誰)/)) {
     return t + "ですか";
   }
 
-  // 終助詞つき → ですかね
+  // ★ 終助詞つき → ですかね
   if (text.match(/(ね|よ)$/)) {
     return t + "ですかね";
   }
 
-  // デフォルト → ですか
+  // ★ デフォルト → ですか
   return t + "ですか";
 }
 
@@ -209,3 +207,4 @@ if ("serviceWorker" in navigator) {
 
 </body>
 </html>
+
