@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>N5変換音声アプリ（完全N5化）</title>
+<title>N5変換音声アプリ（最終版：N5仕様＋判定）</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
@@ -19,7 +19,7 @@ button { font-size: 20px; padding: 12px 24px; }
 </head>
 <body>
 
-<h2>🎤 N5レベル変換・音声アプリ（完全N5化・自然疑問文）</h2>
+<h2>🎤 N5レベル変換・音声アプリ（最終版：N5仕様）</h2>
 <p>ボタンを押して話してください。</p>
 
 <button id="startBtn">録音開始</button>
@@ -91,47 +91,54 @@ if (recognition) {
       statusDiv.className = "";
     };
   };
+
+  recognition.onerror = (e) => {
+    statusDiv.className = "";
+    statusDiv.innerHTML = "❌ エラー: " + e.error;
+  };
+
+  recognition.onend = () => {
+    if (statusDiv.className === "recording") {
+      statusDiv.className = "";
+      statusDiv.innerHTML = "⏹ 録音終了";
+    }
+  };
 }
 
-// ===== N5判定 =====
+// ===== N5判定（ざっくりヒューリスティック） =====
 function isN5Level(text) {
   const hardWords = [
-    "慣れ","出発","説明","連絡","理解","使用","必要","可能","状況"
+    "慣れ","出発","説明","連絡","理解","使用",
+    "必要","可能","状況","体調","変更","最近"
   ];
   for (const w of hardWords) {
     if (text.includes(w)) return false;
   }
-  if (text.match(/けど|ですが|しかし/)) return false;
+  if (text.match(/けど|ですが|しかし|ので|ために/)) return false;
   return true;
 }
 
-// ===== ① 複文 → 単文 =====
+// ===== ① 複文 → 単文（N5向けに分割） =====
 function splitComplexSentence(text) {
   return text.replace(/けど|ですが|しかし|なので|だから/g, "。");
 }
 
-// ===== ② 否定疑問 → 肯定疑問 =====
-function convertNegativeQuestionToPositive(text) {
-  return text
-    .replace(/(.+?)くはなかったですか/g, "$1かったですか")
-    .replace(/(.+?)くなかったですか/g, "$1かったですか");
-}
-
-// ===== ③ 部分否定 → 肯定文 =====
-function removePartialNegative(text) {
-  return text
-    .replace(/(.+?)くはない/g, "$1い")
-    .replace(/(.+?)くない/g, "$1い");
-}
-
-// ===== ④ 複合動詞 → 単純動詞 =====
+// ===== ② 複合動詞 → 単純動詞（N5仕様） =====
 function simplifyComplexVerbs(text) {
   return text
+    .replace(/出発して来ましたか？/g, "出ましたか？")
+    .replace(/出発してきましたか？/g, "出ましたか？")
     .replace(/出発して来ました/g, "出ました")
-    .replace(/出発してきました/g, "出ました");
+    .replace(/出発してきました/g, "出ました")
+    .replace(/出発して来た/g, "出ました")
+    .replace(/出発してきた/g, "出ました")
+    .replace(/説明してくれましたか？/g, "せつめいしましたか？")
+    .replace(/説明してくれました/g, "せつめいしました")
+    .replace(/連絡してくれましたか？/g, "れんらくしましたか？")
+    .replace(/連絡してくれました/g, "れんらくしました");
 }
 
-// ===== ⑤ N4/N3語彙 → N5語彙 =====
+// ===== ③ 語彙 → N5語彙（自然N5） =====
 function simplifyToN5Vocabulary(text) {
   let t = text;
 
@@ -141,6 +148,7 @@ function simplifyToN5Vocabulary(text) {
     "慣れていますか": "どうですか",
     "慣れた": "どうですか",
     "慣れる": "なれます",
+
     "出発": "出ます",
     "説明": "せつめい",
     "連絡": "れんらく",
@@ -148,7 +156,12 @@ function simplifyToN5Vocabulary(text) {
     "使用": "つかいます",
     "必要": "いります",
     "可能": "できます",
-    "状況": "ようす"
+    "状況": "ようす",
+    "体調": "からだの調子",
+    "理由": "わけ",
+    "問題": "こまったこと",
+    "変更": "かえます",
+    "最近": "さいきん"
   };
 
   for (const key in map) {
@@ -159,57 +172,50 @@ function simplifyToN5Vocabulary(text) {
   return t;
 }
 
-// ===== ⑥ 「〜したか」→「〜しましたか」 =====
-function convertShitaToShimashita(text) {
-  return text.replace(/したか$/g, "しましたか");
-}
-
-// ===== ⑦ 「〜たか」→「〜ましたか」 =====
-function convertTaToMashita(text) {
-  return text.replace(/([ぁ-んァ-ン一-龥]+)たか$/g, "$1ましたか");
-}
-
-// ===== ⑧ 文末正規化 =====
+// ===== ④ 文末のノイズ除去（句点・全角スペースなど） =====
 function normalizeSentenceEnd(text) {
-  let t = text;
-
-  t = t.replace(/(ですね|ですよね|ですよ|だよね|だよ|かな|かも|ね|よ)$/g, "");
-  t = t.replace(/。$/g, "");
-
+  let t = text.trim();
+  t = t.replace(/[。．]+$/g, ""); // 文末の。を削除
   return t.trim();
 }
 
-// ===== ⑨ N5疑問文化（A案：二重疑問防止） =====
-function convertToN5Question(text) {
-  // すでに疑問文なら何もしない
-  if (text.match(/ましたか$/)) return text;
-  if (text.match(/ですか$/)) return text;
+// ===== ⑤ 疑問文の「？」付与（形式は尊重） =====
+function ensureQuestionMark(text) {
+  let t = text.trim();
 
-  // 丁寧形 → 疑問形
-  if (text.match(/でした$/)) return text + "か";
-  if (text.match(/ました$/)) return text + "か";
-  if (text.match(/ます$/))   return text + "か";
-  if (text.match(/です$/))   return text + "か";
+  // すでに「？」が付いていればそのまま
+  if (t.endsWith("？") || t.endsWith("?")) return t;
 
-  // それ以外は「ですか」
-  return text + "ですか";
+  // 「か」で終わるなら疑問文とみなして「？」を付ける
+  if (t.endsWith("か")) return t + "？";
+
+  // 「か。」のような誤認識パターン
+  if (t.endsWith("か。")) return t.slice(0, -1) + "？";
+
+  // それ以外はそのまま（平叙文）
+  return t;
 }
 
-// ===== ★ 完全N5変換 =====
+// ===== ★ 完全N5変換（あなたの仕様に合わせた最終版） =====
 function convertToN5(text) {
   let t = text;
 
+  // ① 複文を単文に
   t = splitComplexSentence(t);
-  t = convertNegativeQuestionToPositive(t);
-  t = removePartialNegative(t);
+
+  // ② 複合動詞 → 単純動詞
   t = simplifyComplexVerbs(t);
+
+  // ③ 語彙 → N5語彙
   t = simplifyToN5Vocabulary(t);
 
-  t = convertShitaToShimashita(t);
-  t = convertTaToMashita(t);
-
+  // ④ 文末ノイズ除去（。だけ消す）
   t = normalizeSentenceEnd(t);
-  return convertToN5Question(t);
+
+  // ⑤ 疑問形式は尊重しつつ「？」だけ整える
+  t = ensureQuestionMark(t);
+
+  return t;
 }
 </script>
 
