@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>N4変換音声アプリ（自然疑問文・最新版）</title>
+<title>N4変換音声アプリ</title>
 
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#ffffff">
@@ -164,7 +164,12 @@ function normalizeSentenceEnd(text) {
 function convertToNaturalN4(text) {
   const t = normalizeSentenceEnd(text);
 
-  // ★ 過去形はそのまま疑問文（慣れましたか）
+  // ★ 丁寧語（〜ます）はそのまま疑問文
+  if (t.match(/ます$/)) {
+    return t + "か";
+  }
+
+  // ★ 過去形（〜ました）もそのまま疑問文
   if (t.match(/ました$/)) {
     return t + "か";
   }
