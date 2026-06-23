@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>N4変換音声アプリ（自然疑問文版）</title>
+<title>N4変換音声アプリ（自然疑問文・安定版）</title>
 
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#ffffff">
@@ -85,18 +85,14 @@ rateSlider.oninput = () => {
   rateValue.textContent = rateSlider.value;
 };
 
-// ===== 録音開始 =====
+// ===== 録音開始（cancel() を削除して安定化） =====
 startBtn.onclick = () => {
   if (!recognition) return;
-
-  // 前の読み上げが残っていたら止める
-  if (speechSynthesis.speaking || speechSynthesis.pending) {
-    speechSynthesis.cancel();
-  }
 
   statusDiv.innerHTML = "🎤 録音中…";
   statusDiv.className = "recording";
   resultDiv.innerHTML = "";
+
   recognition.start();
 };
 
@@ -119,4 +115,78 @@ if (recognition) {
 
       resultDiv.innerHTML += "<br>➡ N4変換: " + n4text;
 
-      //
+      // 読み上げ前にだけ cancel() を実行（安全）
+      if (speechSynthesis.speaking || speechSynthesis.pending) {
+        speechSynthesis.cancel();
+      }
+
+      const uttr = new SpeechSynthesisUtterance(n4text);
+      uttr.lang  = "ja-JP";
+      uttr.rate  = parseFloat(rateSlider.value);
+
+      speechSynthesis.speak(uttr);
+
+      uttr.onend = () => {
+        statusDiv.innerHTML = "✔ 完了";
+      };
+    }, 400);
+  };
+
+  // ===== エラー処理 =====
+  recognition.onerror = (e) => {
+    statusDiv.className = "";
+    statusDiv.innerHTML = "❌ エラー: " + e.error;
+  };
+
+  recognition.onend = () => {
+    if (statusDiv.className === "recording") {
+      statusDiv.className = "";
+      statusDiv.innerHTML = "⏹ 録音終了";
+    }
+  };
+}
+
+// ===== 文末正規化 =====
+function normalizeSentenceEnd(text) {
+  let t = text;
+
+  t = t.replace(/(ですね|ですよね|ですよ|だよね|だよ|かな|かも|ね|よ)$/g, "");
+  t = t.replace(/ですか$/g, "です")
+       .replace(/ますか$/g, "ます")
+       .replace(/ましたか$/g, "ました");
+  t = t.replace(/か[？?]$/g, "");
+  t = t.replace(/。$/g, "");
+
+  return t.trim();
+}
+
+// ===== 自然なN4疑問文変換 =====
+function convertToNaturalN4(text) {
+  const t = normalizeSentenceEnd(text);
+
+  if (t.includes("なぜ") || t.includes("どうして")) {
+    return t + "んですか";
+  }
+
+  if (t.match(/(どこ|いつ|何|なに|だれ|誰)/)) {
+    return t + "ですか";
+  }
+
+  if (text.match(/(ね|よ)$/)) {
+    return t + "ですかね";
+  }
+
+  return t + "ですか";
+}
+
+// ===== PWA =====
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker
+    .register("sw.js")
+    .then(() => console.log("SW登録成功"))
+    .catch(err => console.log("SW登録失敗:", err));
+}
+</script>
+
+</body>
+</html>
