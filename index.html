@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>N5変換音声アプリ（完全動作版）</title>
+<title>N5変換音声アプリ（完全動作版＋複合動詞簡単化）</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
@@ -19,7 +19,7 @@ button { font-size: 20px; padding: 12px 24px; }
 </head>
 <body>
 
-<h2>🎤 N5レベル変換・音声アプリ（完全動作版）</h2>
+<h2>🎤 N5レベル変換・音声アプリ（完全動作版＋複合動詞簡単化）</h2>
 <p>ボタンを押して話してください。</p>
 
 <button id="startBtn">録音開始</button>
@@ -145,7 +145,16 @@ function removePartialNegative(text) {
     .replace(/(.+?)くない/g, "$1い");
 }
 
-// ===== ④ 語彙簡単化 =====
+// ===== ④-1 複合動詞 → 単純動詞 =====
+function simplifyComplexVerbs(text) {
+  return text
+    .replace(/出発して来ました/g, "出ました")
+    .replace(/出発してきました/g, "出ました")
+    .replace(/出発して来た/g, "出ました")
+    .replace(/出発してきた/g, "出ました");
+}
+
+// ===== ④-2 語彙簡単化 =====
 function simplifyVocabularyN5(text) {
   let t = text;
 
@@ -219,6 +228,7 @@ function convertToN5(text, isN5) {
     t = splitComplexSentence(t);
     t = convertNegativeQuestionToPositive(t);
     t = removePartialNegative(t);
+    t = simplifyComplexVerbs(t);
     t = simplifyVocabularyN5(t);
   }
 
@@ -229,3 +239,4 @@ function convertToN5(text, isN5) {
 
 </body>
 </html>
+
