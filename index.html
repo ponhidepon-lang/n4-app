@@ -1,5 +1,8 @@
 <!DOCTYPE html>
 <html lang="ja">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.png">
+<meta name="theme-color" content="#ffffff">
 <head>
 <meta charset="UTF-8">
 <title>完全N5変換エンジン（超拡張版）</title>
@@ -324,7 +327,12 @@ if (recognition) {
   };
 }
 </script>
-
+<!-- PWA Service Worker -->
+<script>
+if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/n4-app/sw.js");
+}
+</script>
 </body>
 </html>
 
