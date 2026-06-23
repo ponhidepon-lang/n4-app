@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>N5変換音声アプリ（完全動作版＋複合動詞簡単化）</title>
+<title>N5変換音声アプリ（最終形：完全N5化エンジン）</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
@@ -19,7 +19,7 @@ button { font-size: 20px; padding: 12px 24px; }
 </head>
 <body>
 
-<h2>🎤 N5レベル変換・音声アプリ（完全動作版＋複合動詞簡単化）</h2>
+<h2>🎤 N5レベル変換・音声アプリ（最終形：完全N5化）</h2>
 <p>ボタンを押して話してください。</p>
 
 <button id="startBtn">録音開始</button>
@@ -41,8 +41,6 @@ if (SpeechRec) {
   recognition = new SpeechRec();
   recognition.lang = "ja-JP";
   recognition.interimResults = false;
-} else {
-  alert("音声認識に対応していません。Chrome を使ってください。");
 }
 
 const startBtn  = document.getElementById("startBtn");
@@ -72,13 +70,11 @@ if (recognition) {
     statusDiv.className = "loading";
     statusDiv.innerHTML = "🔄 変換中…";
 
-    const isN5 = isN5Level(text);
-    const n5text = convertToN5(text, isN5);
+    const n5text = convertToN5(text);
 
     resultDiv.innerHTML =
       "認識結果: " + text +
-      "<br>➡ N5変換: " + n5text +
-      "<br>📘 N5判定: " + (isN5 ? "✔ N5レベルです" : "❌ N5レベルではありません");
+      "<br>➡ N5変換: " + n5text;
 
     if (speechSynthesis.speaking || speechSynthesis.pending) {
       speechSynthesis.cancel();
@@ -93,85 +89,64 @@ if (recognition) {
       statusDiv.className = "";
     };
   };
-
-  recognition.onerror = (e) => {
-    statusDiv.className = "";
-    statusDiv.innerHTML = "❌ エラー: " + e.error;
-  };
-
-  recognition.onend = () => {
-    if (statusDiv.className === "recording") {
-      statusDiv.className = "";
-      statusDiv.innerHTML = "⏹ 録音終了";
-    }
-  };
 }
 
-// ===== N5判定 =====
-function isN5Level(text) {
-  if (text.match(/けど|ですが|しかし/)) return false;
-  if (text.match(/くはなかったですか|くなかったですか/)) return false;
-  if (text.match(/くはない|くない/)) return false;
+// ===== ★ N5完全変換エンジン（最終形） =====
 
-  const hardWords = [
-    "体感的","体調","状況","可能","必要","確認","使用",
-    "理由","問題","変更","連絡","理解","説明","最近"
-  ];
-  for (const w of hardWords) {
-    if (text.includes(w)) return false;
-  }
-
-  if (!text.match(/(です|ます|でした|ました|ですか|ますか)$/)) return false;
-
-  return true;
-}
-
-// ===== ① 複文 → 単文 =====
+// --- 複文 → 単文 ---
 function splitComplexSentence(text) {
-  return text.replace(/けど|ですが|しかし/g, "。");
+  return text
+    .replace(/けど|ですが|しかし|それで|なので|だから/g, "。");
 }
 
-// ===== ② 否定疑問 → 肯定疑問 =====
+// --- 否定疑問 → 肯定疑問 ---
 function convertNegativeQuestionToPositive(text) {
   return text
     .replace(/(.+?)くはなかったですか/g, "$1かったですか")
     .replace(/(.+?)くなかったですか/g, "$1かったですか");
 }
 
-// ===== ③ 部分否定 → 肯定文 =====
+// --- 部分否定 → 肯定 ---
 function removePartialNegative(text) {
   return text
     .replace(/(.+?)くはない/g, "$1い")
     .replace(/(.+?)くない/g, "$1い");
 }
 
-// ===== ④-1 複合動詞 → 単純動詞 =====
+// --- 複合動詞 → 単純動詞（自然N5） ---
 function simplifyComplexVerbs(text) {
   return text
     .replace(/出発して来ました/g, "出ました")
     .replace(/出発してきました/g, "出ました")
-    .replace(/出発して来た/g, "出ました")
-    .replace(/出発してきた/g, "出ました");
+    .replace(/説明してくれました/g, "せつめいしました")
+    .replace(/連絡してくれました/g, "れんらくしました")
+    .replace(/持って来ました/g, "持ちました")
+    .replace(/持ってきました/g, "持ちました");
 }
 
-// ===== ④-2 語彙簡単化 =====
-function simplifyVocabularyN5(text) {
+// --- N4/N3語彙 → N5語彙（自然N5） ---
+function simplifyToN5Vocabulary(text) {
   let t = text;
 
   const map = {
-    "体感的": "どう感じますか",
-    "体調": "からだの調子",
-    "状況": "ようす",
-    "可能": "できます",
-    "必要": "いります",
-    "確認": "たしかめます",
+    "慣れましたか": "どうですか",
+    "慣れました": "どうですか",
+    "慣れていますか": "どうですか",
+    "慣れた": "どうですか",
+    "慣れる": "なれます",
+
+    "出発": "出ます",
+    "説明": "せつめい",
+    "連絡": "れんらく",
+    "理解": "わかります",
     "使用": "つかいます",
+    "必要": "いります",
+    "可能": "できます",
+    "状況": "ようす",
+    "体調": "からだの調子",
     "理由": "わけ",
     "問題": "こまったこと",
     "変更": "かえます",
-    "連絡": "れんらく",
-    "理解": "わかります",
-    "説明": "せつめい",
     "最近": "さいきん"
   };
 
@@ -183,54 +158,38 @@ function simplifyVocabularyN5(text) {
   return t;
 }
 
-// ===== ⑤ 文末正規化（最後に実行） =====
+// --- 文末正規化 ---
 function normalizeSentenceEnd(text) {
   let t = text;
 
   t = t.replace(/(ですね|ですよね|ですよ|だよね|だよ|かな|かも|ね|よ)$/g, "");
-
-  t = t.replace(/でしたか$/g, "でした");
-  t = t.replace(/ましたか$/g, "ました");
-  t = t.replace(/ますか$/g, "ます");
-  t = t.replace(/ですか$/g, "です");
-
   t = t.replace(/か[？?]$/g, "");
   t = t.replace(/。$/g, "");
 
   return t.trim();
 }
 
-// ===== ⑥ N5疑問文に変換 =====
+// --- N5疑問文化 ---
 function convertToN5Question(text) {
   const t = text;
 
+  if (t.match(/です$/)) return t + "か";
+  if (t.match(/ます$/)) return t + "か";
   if (t.match(/でした$/)) return t + "か";
   if (t.match(/ました$/)) return t + "か";
-  if (t.match(/ます$/))   return t + "か";
-  if (t.match(/です$/))   return t + "か";
-
-  if (t.match(/(どこ|いつ|何|なに|だれ|誰)/)) {
-    return t + "ですか";
-  }
-
-  if (t.includes("どうして") || t.includes("なぜ")) {
-    return "どうしてですか";
-  }
 
   return t + "ですか";
 }
 
-// ===== ★ 完全N5変換（判定つき） =====
-function convertToN5(text, isN5) {
+// ===== ★ 最終形：完全N5変換 =====
+function convertToN5(text) {
   let t = text;
 
-  if (!isN5) {
-    t = splitComplexSentence(t);
-    t = convertNegativeQuestionToPositive(t);
-    t = removePartialNegative(t);
-    t = simplifyComplexVerbs(t);
-    t = simplifyVocabularyN5(t);
-  }
+  t = splitComplexSentence(t);
+  t = convertNegativeQuestionToPositive(t);
+  t = removePartialNegative(t);
+  t = simplifyComplexVerbs(t);
+  t = simplifyToN5Vocabulary(t);
 
   t = normalizeSentenceEnd(t);
   return convertToN5Question(t);
@@ -239,4 +198,5 @@ function convertToN5(text, isN5) {
 
 </body>
 </html>
+
 
