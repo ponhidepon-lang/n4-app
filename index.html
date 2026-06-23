@@ -77,14 +77,14 @@ if (recognition) {
     resultDiv.innerHTML = "認識結果: " + text;
 
     const n5text = convertToN5(text);
-    const score  = judgeFatigue(text);
+    const n5judge = isN5Level(text) ? "✔ N5レベルです" : "❌ N5レベルではありません";
 
     setTimeout(() => {
       statusDiv.className = "";
       statusDiv.innerHTML = "🟢 読み上げ中…";
 
       resultDiv.innerHTML += "<br>➡ N5変換: " + n5text;
-      resultDiv.innerHTML += "<br>🧪 疲労度判定: " + score;
+      resultDiv.innerHTML += "<br>📘 N5判定: " + n5judge;
 
       if (speechSynthesis.speaking || speechSynthesis.pending) {
         speechSynthesis.cancel();
@@ -113,17 +113,23 @@ if (recognition) {
   };
 }
 
-// ===== 疲労度判定（簡易） =====
-function judgeFatigue(text) {
-  const low  = /(元気|大丈夫|平気|問題ない)/;
-  const mid  = /(まあまあ|普通|ふつう)/;
-  const high = /(疲れた|しんどい|つらい|だるい|ねむい)/;
+// ===== N5判定 =====
+function isN5Level(text) {
+  if (text.match(/けど|ですが|しかし/)) return false;
+  if (text.match(/くはなかったですか|くなかったですか/)) return false;
+  if (text.match(/くはない|くない/)) return false;
 
-  if (high.test(text)) return "高い（かなり疲れています）";
-  if (mid.test(text))  return "中くらい";
-  if (low.test(text))  return "低い（元気です）";
+  const hardWords = [
+    "体感的","体調","状況","可能","必要","確認","使用",
+    "理由","問題","変更","連絡","理解","説明","最近"
+  ];
+  for (const w of hardWords) {
+    if (text.includes(w)) return false;
+  }
 
-  return "不明（もう一度お願いします）";
+  if (!text.match(/(です|ます|でした|ました|ですか|ますか)$/)) return false;
+
+  return true;
 }
 
 // ===== ① 複文 → 単文 =====
