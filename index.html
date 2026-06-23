@@ -2,64 +2,28 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>N4変換音声アプリ<title>
-
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#ffffff">
+<title>N5変換音声アプリ（語彙簡単化つき）</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
 body { font-family: sans-serif; padding: 20px; }
 button { font-size: 20px; padding: 12px 24px; }
-
-#status {
-  margin-top: 20px;
-  font-size: 22px;
-  font-weight: bold;
-}
-
-/* 録音中：赤点滅 */
-.recording {
-  color: red;
-  animation: blink 1s infinite;
-}
-@keyframes blink {
-  0% { opacity: 1; }
-  50% { opacity: 0.2; }
-  100% { opacity: 1; }
-}
-
-/* 変換中：青いぐるぐる */
-.loading::after {
-  content: " 🔄";
-  animation: spin 1s linear infinite;
-}
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-.slider-box {
-  margin-top: 20px;
-  font-size: 18px;
-}
+#status { margin-top: 20px; font-size: 22px; font-weight: bold; }
+.recording { color: red; animation: blink 1s infinite; }
+@keyframes blink { 0%{opacity:1;} 50%{opacity:0.2;} 100%{opacity:1;} }
+.loading::after { content:" 🔄"; animation: spin 1s linear infinite; }
+@keyframes spin { 0%{transform:rotate(0);} 100%{transform:rotate(360deg);} }
 </style>
 </head>
 <body>
 
-<h2>🎤 N4レベル変換・音声出力アプリ（自然疑問文・完全最新版）</h2>
+<h2>🎤 N5レベル変換・音声アプリ（語彙もやさしく）</h2>
 <p>ボタンを押して話してください。</p>
 
 <button id="startBtn">録音開始</button>
 
 <div id="status"></div>
 <div id="result"></div>
-
-<!-- 読み上げ速度調整 -->
-<div class="slider-box">
-  🔊 読み上げ速度：<span id="rateValue">1.0</span><br>
-  <input type="range" id="rateSlider" min="0.5" max="2.0" step="0.1" value="1.0">
-</div>
 
 <script>
 // ===== 音声認識 =====
@@ -71,28 +35,19 @@ if (SpeechRec) {
   recognition.lang = "ja-JP";
   recognition.interimResults = false;
 } else {
-  alert("このブラウザは音声認識に対応していません。Chrome系を推奨します。");
+  alert("音声認識に対応していません。Chrome を使ってください。");
 }
 
-const startBtn   = document.getElementById("startBtn");
-const statusDiv  = document.getElementById("status");
-const resultDiv  = document.getElementById("result");
-const rateSlider = document.getElementById("rateSlider");
-const rateValue  = document.getElementById("rateValue");
-
-// スライダー表示更新
-rateSlider.oninput = () => {
-  rateValue.textContent = rateSlider.value;
-};
+const startBtn  = document.getElementById("startBtn");
+const statusDiv = document.getElementById("status");
+const resultDiv = document.getElementById("result");
 
 // ===== 録音開始 =====
 startBtn.onclick = () => {
   if (!recognition) return;
-
   statusDiv.innerHTML = "🎤 録音中…";
   statusDiv.className = "recording";
   resultDiv.innerHTML = "";
-
   recognition.start();
 };
 
@@ -106,30 +61,21 @@ if (recognition) {
 
     resultDiv.innerHTML = "認識結果: " + text;
 
-    // N4自然疑問文変換
-    const n4text = convertToNaturalN4(text);
+    const n5text = convertToN5(text);
 
     setTimeout(() => {
       statusDiv.className = "";
-      statusDiv.innerHTML = "🟢 読み上げ中…";
+      statusDiv.innerHTML = "🟢 完了";
 
-      resultDiv.innerHTML += "<br>➡ N4変換: " + n4text;
+      resultDiv.innerHTML += "<br>➡ N5変換: " + n5text;
 
-      // 読み上げ前に cancel()
       if (speechSynthesis.speaking || speechSynthesis.pending) {
         speechSynthesis.cancel();
       }
-
-      const uttr = new SpeechSynthesisUtterance(n4text);
-      uttr.lang  = "ja-JP";
-      uttr.rate  = parseFloat(rateSlider.value);
-
+      const uttr = new SpeechSynthesisUtterance(n5text);
+      uttr.lang = "ja-JP";
       speechSynthesis.speak(uttr);
-
-      uttr.onend = () => {
-        statusDiv.innerHTML = "✔ 完了";
-      };
-    }, 400);
+    }, 300);
   };
 
   recognition.onerror = (e) => {
@@ -145,66 +91,81 @@ if (recognition) {
   };
 }
 
-// ===== 文末正規化（強化版） =====
+// ===== 語彙をN5レベルに簡単化 =====
+function simplifyVocabularyN5(text) {
+  let t = text;
+
+  const map = {
+    "体感的": "どう感じますか",
+    "体感": "感じ",
+    "体調": "からだの調子",
+    "状況": "ようす",
+    "可能": "できます",
+    "必要": "いります",
+    "確認": "たしかめます",
+    "使用": "つかいます",
+    "理由": "わけ",
+    "問題": "こまったこと",
+    "変更": "かえます",
+    "連絡": "れんらく",
+    "理解": "わかります",
+    "説明": "せつめい",
+    "最近": "さいきん"
+  };
+
+  for (const key in map) {
+    const reg = new RegExp(key, "g");
+    t = t.replace(reg, map[key]);
+  }
+
+  return t;
+}
+
+// ===== 文末正規化 =====
 function normalizeSentenceEnd(text) {
   let t = text;
 
-  // 終助詞削除
   t = t.replace(/(ですね|ですよね|ですよ|だよね|だよ|かな|かも|ね|よ)$/g, "");
 
-  // 「でしたか」「ましたか」「ますか」「ですか」を壊さず語幹に戻す
   t = t.replace(/でしたか$/g, "でした");
   t = t.replace(/ましたか$/g, "ました");
   t = t.replace(/ますか$/g, "ます");
   t = t.replace(/ですか$/g, "です");
 
-  // 疑問符削除
   t = t.replace(/か[？?]$/g, "");
-
-  // 句点削除
   t = t.replace(/。$/g, "");
 
   return t.trim();
 }
 
-// ===== 自然なN4疑問文変換（完全版） =====
-function convertToNaturalN4(text) {
-  const t = normalizeSentenceEnd(text);
+// ===== N5変換ロジック（語彙簡単化つき） =====
+function convertToN5(text) {
+  // ① 語彙をN5に簡単化
+  let t = simplifyVocabularyN5(text);
 
-  // ★ 最優先：丁寧語（です／ます／ました／でした）はそのまま疑問文
+  // ② 文末正規化
+  t = normalizeSentenceEnd(t);
+
+  // ③ 丁寧語はそのまま疑問文
   if (t.match(/でした$/)) return t + "か";
   if (t.match(/ました$/)) return t + "か";
   if (t.match(/ます$/))   return t + "か";
   if (t.match(/です$/))   return t + "か";
 
-  // ★ 理由系 → んですか
-  if (t.includes("なぜ") || t.includes("どうして")) {
-    return t + "んですか";
-  }
-
-  // ★ 疑問詞 → ですか
+  // ④ 疑問詞
   if (t.match(/(どこ|いつ|何|なに|だれ|誰)/)) {
     return t + "ですか";
   }
 
-  // ★ 終助詞つき → ですかね
-  if (text.match(/(ね|よ)$/)) {
-    return t + "ですかね";
+  // ⑤ 理由系（N5では簡単化）
+  if (t.includes("どうして") || t.includes("なぜ")) {
+    return "どうしてですか";
   }
 
-  // ★ デフォルト → ですか
+  // ⑥ デフォルト
   return t + "ですか";
-}
-
-// ===== PWA =====
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker
-    .register("sw.js")
-    .then(() => console.log("SW登録成功"))
-    .catch(err => console.log("SW登録失敗:", err));
 }
 </script>
 
 </body>
 </html>
-
