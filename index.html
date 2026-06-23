@@ -76,15 +76,15 @@ if (recognition) {
 
     resultDiv.innerHTML = "認識結果: " + text;
 
-    const n5text = convertToN5(text);
-    const n5judge = isN5Level(text) ? "✔ N5レベルです" : "❌ N5レベルではありません";
+    const n5judge = isN5Level(text);
+    const n5text = convertToN5(text);  // ← 判定に応じて分岐する
 
     setTimeout(() => {
       statusDiv.className = "";
       statusDiv.innerHTML = "🟢 読み上げ中…";
 
       resultDiv.innerHTML += "<br>➡ N5変換: " + n5text;
-      resultDiv.innerHTML += "<br>📘 N5判定: " + n5judge;
+      resultDiv.innerHTML += "<br>📘 N5判定: " + (n5judge ? "✔ N5レベルです" : "❌ N5レベルではありません");
 
       if (speechSynthesis.speaking || speechSynthesis.pending) {
         speechSynthesis.cancel();
@@ -217,16 +217,19 @@ function convertToN5Question(text) {
   return t + "ですか";
 }
 
-// ===== 完全N5変換メイン =====
+// ===== ★ 完全N5変換（判定つき） =====
 function convertToN5(text) {
+  const isN5 = isN5Level(text);
   let t = text;
 
-  t = splitComplexSentence(t);
-  t = convertNegativeQuestionToPositive(t);
-  t = removePartialNegative(t);
-  t = simplifyVocabularyN5(t);
-  t = normalizeSentenceEnd(t);
+  if (!isN5) {
+    t = splitComplexSentence(t);
+    t = convertNegativeQuestionToPositive(t);
+    t = removePartialNegative(t);
+    t = simplifyVocabularyN5(t);
+  }
 
+  t = normalizeSentenceEnd(t);
   return convertToN5Question(t);
 }
 </script>
