@@ -164,7 +164,12 @@ function normalizeSentenceEnd(text) {
 function convertToNaturalN4(text) {
   const t = normalizeSentenceEnd(text);
 
-  // ★ 丁寧語（〜ます）はそのまま疑問文
+  // ★ 丁寧語（〜です）はそのまま疑問文
+  if (t.match(/です$/)) {
+    return t + "か";
+  }
+
+  // ★ 丁寧語（〜ます）もそのまま疑問文
   if (t.match(/ます$/)) {
     return t + "か";
   }
