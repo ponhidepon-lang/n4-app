@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>N4変換音声アプリ（自然疑問文・安定版）</title>
+<title>N4変換音声アプリ（自然疑問文・最新版）</title>
 
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#ffffff">
@@ -164,18 +164,27 @@ function normalizeSentenceEnd(text) {
 function convertToNaturalN4(text) {
   const t = normalizeSentenceEnd(text);
 
+  // ★ 過去形はそのまま疑問文（慣れましたか）
+  if (t.match(/ました$/)) {
+    return t + "か";
+  }
+
+  // 理由系 → んですか
   if (t.includes("なぜ") || t.includes("どうして")) {
     return t + "んですか";
   }
 
+  // 疑問詞 → ですか
   if (t.match(/(どこ|いつ|何|なに|だれ|誰)/)) {
     return t + "ですか";
   }
 
+  // 終助詞つき → ですかね
   if (text.match(/(ね|よ)$/)) {
     return t + "ですかね";
   }
 
+  // デフォルト → ですか
   return t + "ですか";
 }
 
