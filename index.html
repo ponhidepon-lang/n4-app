@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>N5変換音声アプリ（完全N5ロジック＋判定＋速度調整）</title>
+<title>N5変換音声アプリ（完全動作版）</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
@@ -19,7 +19,7 @@ button { font-size: 20px; padding: 12px 24px; }
 </head>
 <body>
 
-<h2>🎤 N5レベル変換・音声アプリ（完全版）</h2>
+<h2>🎤 N5レベル変換・音声アプリ（完全動作版）</h2>
 <p>ボタンを押して話してください。</p>
 
 <button id="startBtn">録音開始</button>
@@ -27,7 +27,6 @@ button { font-size: 20px; padding: 12px 24px; }
 <div id="status"></div>
 <div id="result"></div>
 
-<!-- 読み上げ速度調整 -->
 <div class="slider-box">
   🔊 読み上げ速度：<span id="rateValue">1.0</span><br>
   <input type="range" id="rateSlider" min="0.5" max="2.0" step="0.1" value="1.0">
@@ -52,7 +51,6 @@ const resultDiv = document.getElementById("result");
 const rateSlider = document.getElementById("rateSlider");
 const rateValue  = document.getElementById("rateValue");
 
-// スライダー表示更新
 rateSlider.oninput = () => {
   rateValue.textContent = rateSlider.value;
 };
@@ -74,30 +72,27 @@ if (recognition) {
     statusDiv.className = "loading";
     statusDiv.innerHTML = "🔄 変換中…";
 
-    resultDiv.innerHTML = "認識結果: " + text;
+    const isN5 = isN5Level(text);
+    const n5text = convertToN5(text, isN5);
 
-    const n5judge = isN5Level(text);
-    const n5text = convertToN5(text);  // ← 判定に応じて分岐する
+    resultDiv.innerHTML =
+      "認識結果: " + text +
+      "<br>➡ N5変換: " + n5text +
+      "<br>📘 N5判定: " + (isN5 ? "✔ N5レベルです" : "❌ N5レベルではありません");
 
-    setTimeout(() => {
+    // 読み上げ
+    if (speechSynthesis.speaking || speechSynthesis.pending) {
+      speechSynthesis.cancel();
+    }
+    const uttr = new SpeechSynthesisUtterance(n5text);
+    uttr.lang = "ja-JP";
+    uttr.rate = parseFloat(rateSlider.value);
+    speechSynthesis.speak(uttr);
+
+    uttr.onend = () => {
+      statusDiv.innerHTML = "✔ 完了";
       statusDiv.className = "";
-      statusDiv.innerHTML = "🟢 読み上げ中…";
-
-      resultDiv.innerHTML += "<br>➡ N5変換: " + n5text;
-      resultDiv.innerHTML += "<br>📘 N5判定: " + (n5judge ? "✔ N5レベルです" : "❌ N5レベルではありません");
-
-      if (speechSynthesis.speaking || speechSynthesis.pending) {
-        speechSynthesis.cancel();
-      }
-      const uttr = new SpeechSynthesisUtterance(n5text);
-      uttr.lang = "ja-JP";
-      uttr.rate = parseFloat(rateSlider.value);
-      speechSynthesis.speak(uttr);
-
-      uttr.onend = () => {
-        statusDiv.innerHTML = "✔ 完了";
-      };
-    }, 300);
+    };
   };
 
   recognition.onerror = (e) => {
@@ -218,8 +213,7 @@ function convertToN5Question(text) {
 }
 
 // ===== ★ 完全N5変換（判定つき） =====
-function convertToN5(text) {
-  const isN5 = isN5Level(text);
+function convertToN5(text, isN5) {
   let t = text;
 
   if (!isN5) {
@@ -236,3 +230,4 @@ function convertToN5(text) {
 
 </body>
 </html>
+
