@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>N4変換音声アプリ</title>
+
+<!-- PWA対応 -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ffffff">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+body { font-family: sans-serif; padding: 20px; }
+button { font-size: 20px; padding: 10px 20px; }
+#result { margin-top: 20px; font-size: 22px; }
+</style>
+</head>
+<body>
+
+<h2>🎤 N4レベル変換・音声出力アプリ</h2>
+<p>ボタンを押して話してください。</p>
+
+<button id="startBtn">録音開始</button>
+
+<div id="result"></div>
+
+<script>
+// 音声認識
+let recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+recognition.lang = "ja-JP";
+recognition.interimResults = false;
+
+const startBtn = document.getElementById("startBtn");
+const resultDiv = document.getElementById("result");
+
+startBtn.onclick = () => {
+    resultDiv.innerHTML = "🎤 聞いています…";
+    recognition.start();
+};
+
+recognition.onresult = (event) => {
+    const text = event.results[0][0].transcript.trim();
+    resultDiv.innerHTML = "認識結果: " + text;
+
+    const n4text = convertToNaturalN4(text);
+    resultDiv.innerHTML += "<br>➡ N4変換: " + n4text;
+
+    // 音声読み上げ
+    const uttr = new SpeechSynthesisUtterance(n4text);
+    uttr.lang = "ja-JP";
+    speechSynthesis.speak(uttr);
+};
+
+// 自然なN4変換
+function convertToNaturalN4(text) {
+    let t = text;
+
+    // 理由系の質問か判定
+    const reasonWords = ["なぜ", "どうして", "理由"];
+    const isReasonQuestion = reasonWords.some(w => t.includes(w));
+
+    // 文末を「んですか」に変換
+    t = t.replace(/ですか$/, "")
+         .replace(/ましたか$/, "ました")
+         .replace(/ますか$/, "ます");
+
+    if (!t.endsWith("んですか")) {
+        t = t + "んですか";
+    }
+
+    // 理由系だけ「どうして」を付ける
+    if (isReasonQuestion && !t.startsWith("どうして")) {
+        t = "どうして " + t;
+    }
+
+    return t;
+}
+
+// Service Worker 登録（PWA必須）
+if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("sw.js");
+}
+</script>
+
+</body>
+</html>
