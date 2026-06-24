@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>完全N5変換エンジン</title>
+  <title>N5変換エンジン</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
   <!-- PWA -->
@@ -12,23 +12,28 @@
 
   <style>
     body { font-family: sans-serif; padding: 20px; }
-    button { font-size: 20px; padding: 12px 24px; }
-    #status { margin-top: 20px; font-size: 22px; font-weight: bold; }
+    button { font-size: 18px; padding: 10px 20px; margin-right: 8px; margin-top: 8px; }
+    #status { margin-top: 20px; font-size: 20px; font-weight: bold; }
     .recording { color: red; animation: blink 1s infinite; }
     @keyframes blink { 0%{opacity:1;} 50%{opacity:0.2;} 100%{opacity:1;} }
     .loading::after { content:" 🔄"; animation: spin 1s linear infinite; }
     @keyframes spin { 0%{transform:rotate(0);} 100%{transform:rotate(360deg);} }
-    .slider-box { margin-top: 20px; font-size: 18px; }
+    .slider-box { margin-top: 20px; font-size: 16px; }
+    #questionBox { margin-top: 20px; padding: 10px; border: 1px solid #ccc; font-size: 18px; min-height: 40px; }
+    #result { margin-top: 10px; font-size: 16px; }
   </style>
 </head>
 <body>
 
-<h2>🎤 完全N5変換エンジン</h2>
-<p>ボタンを押して話してください。</p>
+<h2>🎤 N5変換エンジン</h2>
+<p>ボタンを押して話すか、「次の質問」ボタンでN5質問を出せます。</p>
 
 <button id="startBtn">録音開始</button>
+<button id="nextQuestionBtn">次の質問を出す</button>
+<button id="readQuestionBtn">質問を読み上げる</button>
 
 <div id="status"></div>
+<div id="questionBox"></div>
 <div id="result"></div>
 
 <div class="slider-box">
@@ -49,11 +54,14 @@ if (SpeechRec) {
   alert("音声認識に対応していません。Chrome を使ってください。");
 }
 
-const startBtn   = document.getElementById("startBtn");
-const statusDiv  = document.getElementById("status");
-const resultDiv  = document.getElementById("result");
-const rateSlider = document.getElementById("rateSlider");
-const rateValue  = document.getElementById("rateValue");
+const startBtn          = document.getElementById("startBtn");
+const statusDiv         = document.getElementById("status");
+const resultDiv         = document.getElementById("result");
+const rateSlider        = document.getElementById("rateSlider");
+const rateValue         = document.getElementById("rateValue");
+const nextQuestionBtn   = document.getElementById("nextQuestionBtn");
+const readQuestionBtn   = document.getElementById("readQuestionBtn");
+const questionBox       = document.getElementById("questionBox");
 
 rateSlider.oninput = () => {
   rateValue.textContent = rateSlider.value;
@@ -117,7 +125,7 @@ const N4Patterns = [
   /経験/g,
   /必要/g,
   /可能/g,
-  /〜たことがあります/g
+  /たことがあります/g
 ];
 
 // ===== N5判定（語彙＋文型の2段階） =====
@@ -128,7 +136,6 @@ function isN5Level(text) {
   for (const p of N4Patterns) {
     if (text.match(p)) return false;
   }
-  // 「の」が多すぎる（多重修飾）もN4扱い
   if ((text.match(/の/g) || []).length >= 3) return false;
   return true;
 }
@@ -236,7 +243,7 @@ function ensureQuestionMark(t) {
   return t;
 }
 
-// ===== ★ 完全N5変換エンジン（強化版） =====
+// ===== 完全N5変換エンジン =====
 function convertToN5(text) {
   let t = text;
 
@@ -247,7 +254,6 @@ function convertToN5(text) {
   t = simplifyRangeExpressions(t);
   t = applyN4toN5Vocabulary(t);
 
-  // 抽象表現の簡略化
   t = t.replace(/どのように/g, "どう");
   t = t.replace(/どのような/g, "どんな");
   t = t.replace(/について/g, "のことを");
@@ -256,6 +262,18 @@ function convertToN5(text) {
   t = ensureQuestionMark(t);
 
   return t;
+}
+
+// ===== 質問読み上げ =====
+function speakText(text) {
+  if (!text) return;
+  if (speechSynthesis.speaking || speechSynthesis.pending) {
+    speechSynthesis.cancel();
+  }
+  const uttr = new SpeechSynthesisUtterance(text);
+  uttr.lang = "ja-JP";
+  uttr.rate = parseFloat(rateSlider.value);
+  speechSynthesis.speak(uttr);
 }
 
 // ===== 録音開始 =====
@@ -283,15 +301,9 @@ if (recognition) {
       "<br>➡ N5変換: " + n5text +
       "<br>📘 N5判定: " + (n5judge ? "✔ N5レベルです" : "❌ N5レベルではありません");
 
-    if (speechSynthesis.speaking || speechSynthesis.pending) {
-      speechSynthesis.cancel();
-    }
-    const uttr = new SpeechSynthesisUtterance(n5text);
-    uttr.lang = "ja-JP";
-    uttr.rate = parseFloat(rateSlider.value);
-    speechSynthesis.speak(uttr);
+    speakText(n5text);
 
-    uttr.onend = () => {
+    speechSynthesis.onend = () => {
       statusDiv.innerHTML = "✔ 完了";
       statusDiv.className = "";
     };
@@ -309,6 +321,19 @@ if (recognition) {
     }
   };
 }
+
+// ===== 「次の質問を出す」ボタン =====
+nextQuestionBtn.onclick = () => {
+  const idx = Math.floor(Math.random() * N5_QUESTIONS.length);
+  const q = N5_QUESTIONS[idx];
+  questionBox.textContent = "❓ 質問: " + q;
+};
+
+// ===== 「質問を読み上げる」ボタン =====
+readQuestionBtn.onclick = () => {
+  const text = questionBox.textContent.replace(/^❓ 質問:\s*/, "");
+  speakText(text);
+};
 </script>
 
 <!-- PWA Service Worker -->
