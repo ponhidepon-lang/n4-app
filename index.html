@@ -1,24 +1,25 @@
 <!DOCTYPE html>
 <html lang="ja">
-<link rel="manifest" href="manifest.json">
-<link rel="icon" href="icon.png">
-<meta name="theme-color" content="#ffffff">
 <head>
-<meta charset="UTF-8">
-<title>完全N5変換エンジン（超拡張版）</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="UTF-8">
+  <title>完全N5変換エンジン（超拡張版）</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
 
-<style>
-body { font-family: sans-serif; padding: 20px; }
-button { font-size: 20px; padding: 12px 24px; }
-#status { margin-top: 20px; font-size: 22px; font-weight: bold; }
-.recording { color: red; animation: blink 1s infinite; }
-@keyframes blink { 0%{opacity:1;} 50%{opacity:0.2;} 100%{opacity:1;} }
-.loading::after { content:" 🔄"; animation: spin 1s linear infinite; }
-@keyframes spin { 0%{transform:rotate(0);} 100%{transform:rotate(360deg);} }
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon.png">
+  <meta name="theme-color" content="#ffffff">
 
-.slider-box { margin-top: 20px; font-size: 18px; }
-</style>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    button { font-size: 20px; padding: 12px 24px; }
+    #status { margin-top: 20px; font-size: 22px; font-weight: bold; }
+    .recording { color: red; animation: blink 1s infinite; }
+    @keyframes blink { 0%{opacity:1;} 50%{opacity:0.2;} 100%{opacity:1;} }
+    .loading::after { content:" 🔄"; animation: spin 1s linear infinite; }
+    @keyframes spin { 0%{transform:rotate(0);} 100%{transform:rotate(360deg);} }
+    .slider-box { margin-top: 20px; font-size: 18px; }
+  </style>
 </head>
 <body>
 
@@ -48,9 +49,9 @@ if (SpeechRec) {
   alert("音声認識に対応していません。Chrome を使ってください。");
 }
 
-const startBtn  = document.getElementById("startBtn");
-const statusDiv = document.getElementById("status");
-const resultDiv = document.getElementById("result");
+const startBtn   = document.getElementById("startBtn");
+const statusDiv  = document.getElementById("status");
+const resultDiv  = document.getElementById("result");
 const rateSlider = document.getElementById("rateSlider");
 const rateValue  = document.getElementById("rateValue");
 
@@ -58,55 +59,124 @@ rateSlider.oninput = () => {
   rateValue.textContent = rateSlider.value;
 };
 
-// ===== N4語彙（判定用・超拡張版） =====
-const N4Words = [
-
-  // 役職・組織
-  "社長","部長","課長","所長","主任","係長","社員","担当","責任","役員","管理","部署",
-  "上司","先輩","後輩",
-
-  // 抽象語
-  "経験","説明","連絡","理解","必要","可能","状況","体調","理由","問題","変更","結果",
-  "資料","方法","途中","安全","危険","複雑","特別","場合","以上","以下","以外","関係",
-  "予定","準備","連続","影響","効果","原因","目的","内容","詳細","確認","調整","対応",
-  "報告","相談","記録","比較","選択","決定","許可","禁止","注意","案内","希望",
-
-  // 動作・状態
-  "参加","出席","欠席","移動","到着","出発","開始","終了","保存","提出","受け取り",
-  "登録","申請","予約","解決","改善","維持","増加","減少","発生","調査","検討",
-
-  // 時間・数量
-  "最近","以前","以後","期間","回数","全員","全体","部分","多数","少数","平均","合計",
-  "期限","締切","順番","順序","時間帯","当日","翌日","翌週","翌月",
-
-  // ビジネス語
-  "会議","打ち合わせ","報告書","契約","見積もり","請求","支払い","納品","発注",
-  "取引","顧客","担当者","営業","開発","品質","効率","生産","在庫",
-
-  // 技能実習生向け語彙
-  "技能実習","実習生","監理団体","実習先","企業","工場","作業","工程","安全確認",
-  "危険物","保護具","手順書","指示","注意事項","規則","規定",
-  "寮","宿舎","光熱費","家賃","送金","仕送り","銀行口座","保険","年金","在留カード",
-  "更新","手続き","申請","面談","講習","研修","指導員","班長","先輩","後輩",
-  "宗教","礼拝","食事制限","アレルギー","健康診断","病院","通院","症状","怪我",
-  "残業","休日出勤","シフト","勤務時間","休憩","遅刻","欠勤","早退",
-  "日本語能力","会話","読解","聴解","テスト","勉強","宿題",
-  "文化","習慣","マナー","ゴミ分別","地域","自治会","行事",
-
-  // ホームページ類義語
-  "ホームページ","HP","ウェブサイト","ウェブページ","サイト","公式サイト","ページ",
-
-  // 範囲表現
-  "ここまで","そこまで","あそこまで","どこまで",
-
-  // 所要時間
-  "何分","何時間","かかりました","かかります"
+// ===== N5質問テンプレ（面接用・全部N5） =====
+const N5_QUESTIONS = [
+  // 仕事の理解
+  "この仕事をするまえ、どう思いましたか。",
+  "この仕事は、むずかしいと思いますか。",
+  "この仕事で、なにがたいへんだと思いますか。",
+  "この仕事で、なにをしたいですか。",
+  // 経験
+  "この仕事をしたことがありますか。",
+  "どこでしましたか。",
+  "どのくらいしましたか。",
+  // 動機
+  "どうして、この仕事をしたいですか。",
+  "この仕事をえらんだわけはなんですか。",
+  // 生活
+  "にほんのくらしはどうですか。",
+  "へやはどうですか。",
+  "しごとのじかんはどうですか。",
+  // 健康
+  "からだはだいじょうぶですか。",
+  "びょうきはありますか。",
+  // 人間関係
+  "しごとの人とはなかがいいですか。",
+  "せんぱいはやさしいですか。",
+  // 安全
+  "あぶないことはありましたか。",
+  "しごとで、なににきをつけていますか。"
 ];
 
-// ===== N4→N5 文脈置換マップ（超拡張版） =====
-const N4toN5Map = {
+// ===== N4語彙（拡張版） =====
+const N4Words = [
+  "イメージ","どのよう","について","考えていました","考える","印象","理由","内容","経験","説明","理解","状況",
+  "社長","部長","課長","所長","主任","係長","社員","担当","責任","役員","管理","部署",
+  "上司","先輩","後輩",
+  "必要","可能","問題","変更","結果","資料","方法","途中","安全","危険","複雑","特別",
+  "予定","準備","影響","効果","原因","目的","詳細","確認","調整","対応","報告","相談",
+  "記録","比較","選択","決定","許可","禁止","案内","希望",
+  "参加","出席","欠席","移動","到着","出発","開始","終了","保存","提出","受け取り",
+  "登録","申請","予約","解決","改善","維持","増加","減少","発生","調査","検討",
+  "最近","以前","以後","期間","平均","合計","期限","締切","順番","時間帯",
+  "会議","打ち合わせ","契約","見積もり","請求","支払い","納品","発注","取引","顧客",
+  "技能実習","実習生","監理団体","実習先","企業","工程","安全確認","危険物","保護具",
+  "手順書","指示","注意事項","規則","規定","寮","宿舎","光熱費","家賃","送金","仕送り",
+  "健康診断","症状","怪我","残業","休日出勤","シフト","勤務時間","文化","習慣","マナー"
+];
 
-  // 役職
+// ===== N4文型パターン =====
+const N4Patterns = [
+  /どのように/g,
+  /どのような/g,
+  /について/g,
+  /と思います/g,
+  /と考え/g,
+  /理由/g,
+  /内容/g,
+  /経験/g,
+  /必要/g,
+  /可能/g,
+  /〜たことがあります/g
+];
+
+// ===== N5判定（語彙＋文型の2段階） =====
+function isN5Level(text) {
+  for (const w of N4Words) {
+    if (text.includes(w)) return false;
+  }
+  for (const p of N4Patterns) {
+    if (text.match(p)) return false;
+  }
+  // 「の」が多すぎる（多重修飾）もN4扱い
+  if ((text.match(/の/g) || []).length >= 3) return false;
+  return true;
+}
+
+// ===== 部品：所要時間・範囲・経験などの簡略化 =====
+function simplifyDurationExpressions(t) {
+  return t
+    .replace(/何分かかりましたか？/g, "どのくらいかかりましたか？")
+    .replace(/何時間かかりましたか？/g, "どのくらいかかりましたか？")
+    .replace(/何分かかりました/g, "どのくらいかかりました")
+    .replace(/何時間かかりました/g, "どのくらいかかりました");
+}
+
+function simplifyRangeExpressions(t) {
+  return t
+    .replace(/ここまで/g, "いままで")
+    .replace(/そこまで/g, "そこまで")
+    .replace(/あそこまで/g, "あそこまで");
+}
+
+function simplifyExperienceExpressions(t) {
+  return t
+    .replace(/見たことがありますか？/g, "見ましたか？")
+    .replace(/働いたことがありますか？/g, "はたらきましたか？")
+    .replace(/工場で働いたことがありますか？/g, "こうじょうではたらきましたか？")
+    .replace(/日本で働いたことがありますか？/g, "にほんではたらきましたか？")
+    .replace(/寮に住んだことがありますか？/g, "へやにすんだことがありますか？");
+}
+
+function splitComplexSentence(t) {
+  return t.replace(/けど|ですが|しかし|なので|だから/g, "。");
+}
+
+function simplifyVerbsContext(t) {
+  return t
+    .replace(/出発してきましたか？/g, "出ましたか？")
+    .replace(/出発してきました/g, "出ました")
+    .replace(/出発しましたか？/g, "出ましたか？")
+    .replace(/出発しました/g, "出ました")
+    .replace(/出発します/g, "出ます");
+}
+
+// ===== N4→N5語彙マップ =====
+const N4toN5Map = {
+  "イメージ": "かんがえ",
+  "印象": "かんがえ",
+  "内容": "こと",
+  "理由": "わけ",
   "上司": "上の人",
   "先輩": "まえからいる人",
   "後輩": "あとからきた人",
@@ -115,28 +185,8 @@ const N4toN5Map = {
   "所長": "えらい人",
   "主任": "えらい人",
   "係長": "えらい人",
-
-  // 範囲表現
-  "ここまで": "いままで",
-  "そこまで": "そこまで",
-  "あそこまで": "あそこまで",
-
-  // 所要時間
-  "何分かかりました": "どのくらいかかりました",
-  "何時間かかりました": "どのくらいかかりました",
-
-  // ホームページ類義語
-  "ホームページ": "ページ",
-  "HP": "ページ",
-  "ウェブサイト": "ページ",
-  "ウェブページ": "ページ",
-  "サイト": "ページ",
-  "公式サイト": "ページ",
-
-  // 技能実習生向け
   "技能実習": "しごとのべんきょう",
   "実習生": "しごとのべんきょうをする人",
-  "工場": "こうじょう",
   "作業": "しごと",
   "工程": "しごとのながれ",
   "安全確認": "あんぜんをたしかめます",
@@ -158,83 +208,12 @@ const N4toN5Map = {
   "休日出勤": "やすみの日にしごと",
   "シフト": "しごとのじかん",
   "勤務時間": "しごとのじかん",
-  "遅刻": "おくれます",
-  "欠勤": "やすみます",
   "文化": "にほんのこと",
   "習慣": "いつものこと",
   "マナー": "ルール",
   "ゴミ分別": "ごみをわけます"
 };
 
-// ===== N5判定 =====
-function isN5Level(text) {
-
-  // N4語彙
-  for (const w of N4Words) {
-    if (text.includes(w)) return false;
-  }
-
-  // 範囲表現
-  if (text.match(/ここまで|そこまで|あそこまで|どこまで/)) return false;
-
-  // 所要時間
-  if (text.match(/何分|何時間|かかりました|かかります/)) return false;
-
-  // 役職語彙
-  if (text.match(/上司|先輩|後輩|部長|課長|所長|主任|係長/)) return false;
-
-  // N4文法
-  if (text.match(/と言いますか|ので|ために/)) return false;
-
-  // 多重修飾
-  if ((text.match(/の/g) || []).length >= 3) return false;
-
-  return true;
-}
-
-// ===== 所要時間 → N5仕様 =====
-function simplifyDurationExpressions(t) {
-  return t
-    .replace(/何分かかりましたか？/g, "どのくらいかかりましたか？")
-    .replace(/何時間かかりましたか？/g, "どのくらいかかりましたか？")
-    .replace(/何分かかりました/g, "どのくらいかかりました")
-    .replace(/何時間かかりました/g, "どのくらいかかりました");
-}
-
-// ===== 範囲表現 → N5仕様 =====
-function simplifyRangeExpressions(t) {
-  return t
-    .replace(/ここまで/g, "いままで")
-    .replace(/そこまで/g, "そこまで")
-    .replace(/あそこまで/g, "あそこまで");
-}
-
-// ===== 経験表現 =====
-function simplifyExperienceExpressions(t) {
-  return t
-    .replace(/見たことがありますか？/g, "見ましたか？")
-    .replace(/働いたことがありますか？/g, "はたらきましたか？")
-    .replace(/工場で働いたことがありますか？/g, "こうじょうではたらきましたか？")
-    .replace(/日本で働いたことがありますか？/g, "にほんではたらきましたか？")
-    .replace(/寮に住んだことがありますか？/g, "へやにすんだことがありますか？");
-}
-
-// ===== 複文 → 単文 =====
-function splitComplexSentence(text) {
-  return text.replace(/けど|ですが|しかし|なので|だから/g, "。");
-}
-
-// ===== 複合動詞 =====
-function simplifyVerbsContext(t) {
-  return t
-    .replace(/出発してきましたか？/g, "出ましたか？")
-    .replace(/出発してきました/g, "出ました")
-    .replace(/出発しましたか？/g, "出ましたか？")
-    .replace(/出発しました/g, "出ました")
-    .replace(/出発します/g, "出ます");
-}
-
-// ===== N4語彙 → N5語彙 =====
 function applyN4toN5Vocabulary(t) {
   for (const key in N4toN5Map) {
     const reg = new RegExp(key, "g");
@@ -250,7 +229,6 @@ function normalizeSentenceEnd(t) {
   return t.trim();
 }
 
-// ===== 疑問文の「？」付与 =====
 function ensureQuestionMark(t) {
   if (t.endsWith("？") || t.endsWith("?")) return t;
   if (t.endsWith("か") || t.endsWith("かね")) return t + "？";
@@ -258,7 +236,7 @@ function ensureQuestionMark(t) {
   return t;
 }
 
-// ===== ★ 完全N5変換エンジン（超拡張版） =====
+// ===== ★ 完全N5変換エンジン（強化版） =====
 function convertToN5(text) {
   let t = text;
 
@@ -268,6 +246,11 @@ function convertToN5(text) {
   t = simplifyDurationExpressions(t);
   t = simplifyRangeExpressions(t);
   t = applyN4toN5Vocabulary(t);
+
+  // 抽象表現の簡略化
+  t = t.replace(/どのように/g, "どう");
+  t = t.replace(/どのような/g, "どんな");
+  t = t.replace(/について/g, "のことを");
 
   t = normalizeSentenceEnd(t);
   t = ensureQuestionMark(t);
@@ -292,7 +275,7 @@ if (recognition) {
     statusDiv.className = "loading";
     statusDiv.innerHTML = "🔄 変換中…";
 
-    const n5text = convertToN5(text);
+    const n5text  = convertToN5(text);
     const n5judge = isN5Level(text);
 
     resultDiv.innerHTML =
@@ -327,12 +310,13 @@ if (recognition) {
   };
 }
 </script>
+
 <!-- PWA Service Worker -->
 <script>
 if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("/n4-app/sw.js");
+  navigator.serviceWorker.register("/n4-app/sw.js");
 }
 </script>
+
 </body>
 </html>
-
